@@ -1,6 +1,20 @@
 import { supabase } from "@/integrations/supabase/client";
 
+// For the Public Gallery: Only gets APPROVED artifacts
 export async function fetchArtifacts() {
+  // Added "as any" to supabase to stop the infinite TypeScript loop
+  const { data, error } = await (supabase as any)
+    .from("artifacts")
+    .select("*, categories(name), artifact_images(*)")
+    .eq("status", "approved")
+    .order("created_at", { ascending: false });
+    
+  if (error) throw error;
+  return data;
+}
+
+// For the Admin Dashboard: Gets ALL artifacts (including pending ones)
+export async function fetchAdminArtifacts() {
   const { data, error } = await supabase
     .from("artifacts")
     .select("*, categories(name), artifact_images(*)")
@@ -76,3 +90,46 @@ export async function checkIsAdmin() {
     .maybeSingle();
   return !!data;
 }
+
+// Get the current user's role
+export const getUserRole = async () => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return null;
+  
+  const { data } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", session.user.id)
+    .single();
+    
+  return data?.role || null;
+};
+
+// Insert a new activity log
+export const logActivity = async (action: string, details: string) => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return;
+
+  const role = await getUserRole();
+
+  // Added "as any" to bypass the TypeScript warning
+  await supabase.from("activity_logs" as any).insert({
+    user_id: session.user.id,
+    user_email: session.user.email,
+    role: role || 'unknown',
+    action: action,
+    details: details
+  });
+};
+
+// Fetch activity logs
+export const fetchActivityLogs = async () => {
+  // Added "as any" to bypass the TypeScript warning
+  const { data, error } = await supabase
+    .from("activity_logs" as any)
+    .select("*")
+    .order("created_at", { ascending: false });
+    
+  if (error) throw error;
+  return data;
+};

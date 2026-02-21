@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { logActivity } from "@/lib/supabase-helpers";
 
 const AdminLogin = () => {
   const [email, setEmail] = useState("");
@@ -15,16 +16,23 @@ const AdminLogin = () => {
   const { toast } = useToast();
 
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
-    if (error) {
-      toast({ title: "Login failed", description: error.message, variant: "destructive" });
-      return;
-    }
-    navigate("/admin");
-  };
+  e.preventDefault();
+  setLoading(true);
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  setLoading(false);
+  
+  if (error) {
+    toast({ title: "Login failed", description: error.message, variant: "destructive" });
+    return;
+  }
+  
+  // LOG THE LOGIN ACTIVITY
+  if (data.session) {
+    await logActivity("Login", "User signed in to the dashboard");
+  }
+  
+  navigate("/admin");
+};
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">

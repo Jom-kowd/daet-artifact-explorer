@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { QrCode, Plus, Trash2, Pencil, BarChart3, LogOut, Layers, Image, Eye } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { QrCode, Plus, Trash2, Pencil, LogOut, Layers, Image, Eye, ClipboardList, CheckCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchArtifacts, fetchCategories, uploadArtifactImage, fetchScanAnalytics, checkIsAdmin } from "@/lib/supabase-helpers";
+import { fetchAdminArtifacts, fetchCategories, uploadArtifactImage, getUserRole, logActivity } from "@/lib/supabase-helpers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,26 +15,31 @@ import { QRCodeSVG } from "qrcode.react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AnalyticsTab from "@/components/admin/AnalyticsTab";
 import CategoriesTab from "@/components/admin/CategoriesTab";
+import ActivityLogsTab from "@/components/admin/ActivityLogsTab";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
 
   useEffect(() => {
     const check = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { navigate("/admin/login"); return; }
-      const admin = await checkIsAdmin();
-      if (!admin) { toast({ title: "Access denied", description: "You don't have admin privileges.", variant: "destructive" }); navigate("/"); return; }
-      setIsAdmin(true);
+      
+      const role = await getUserRole();
+      if (role !== "admin" && role !== "staff") { 
+        toast({ title: "Access denied", description: "You don't have dashboard privileges.", variant: "destructive" }); 
+        navigate("/"); 
+        return; 
+      }
+      setIsAdmin(role === "admin"); // True if admin, False if staff
     };
     check();
   }, [navigate, toast]);
 
-  const { data: artifacts } = useQuery({ queryKey: ["artifacts"], queryFn: fetchArtifacts, enabled: isAdmin === true });
-  const { data: categories } = useQuery({ queryKey: ["categories"], queryFn: fetchCategories, enabled: isAdmin === true });
+  const { data: artifacts } = useQuery({ queryKey: ["admin_artifacts"], queryFn: fetchAdminArtifacts, enabled: isAdmin !== null });
+  const { data: categories } = useQuery({ queryKey: ["categories"], queryFn: fetchCategories, enabled: isAdmin !== null });
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -61,29 +66,34 @@ const AdminDashboard = () => {
       </header>
 
       <main className="container py-8">
-        {/* Stats */}
         <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
-          <StatCard label="Artifacts" value={artifacts?.length || 0} icon={<Layers className="h-5 w-5" />} />
-          <StatCard label="Categories" value={categories?.length || 0} icon={<QrCode className="h-5 w-5" />} />
+          <StatCard label="Total Artifacts" value={artifacts?.length || 0} icon={<Layers className="h-5 w-5" />} />
+          <StatCard label="Pending Approval" value={artifacts?.filter((a: any) => a.status === 'pending').length || 0} icon={<CheckCircle className="h-5 w-5 text-yellow-500" />} />
           <StatCard label="Total Views" value={artifacts?.reduce((sum: number, a: any) => sum + (a.view_count || 0), 0) || 0} icon={<Eye className="h-5 w-5" />} />
-          <StatCard label="With Images" value={artifacts?.filter((a: any) => a.artifact_images?.length > 0).length || 0} icon={<Image className="h-5 w-5" />} />
+          <StatCard label="Categories" value={categories?.length || 0} icon={<QrCode className="h-5 w-5" />} />
         </div>
 
         <Tabs defaultValue="artifacts">
-          <TabsList>
+          <TabsList className="flex flex-wrap h-auto">
             <TabsTrigger value="artifacts">Artifacts</TabsTrigger>
-            <TabsTrigger value="categories">Categories</TabsTrigger>
-            <TabsTrigger value="analytics">Analytics</TabsTrigger>
+            {isAdmin && <TabsTrigger value="categories">Categories</TabsTrigger>}
+            {isAdmin && <TabsTrigger value="analytics">Analytics</TabsTrigger>}
+            <TabsTrigger value="logs" className="hidden md:flex"><ClipboardList className="mr-2 h-4 w-4"/> Activity Logs</TabsTrigger>
           </TabsList>
 
           <TabsContent value="artifacts" className="mt-6">
-            <ArtifactsTab artifacts={artifacts} categories={categories} />
+            <ArtifactsTab artifacts={artifacts} categories={categories} isAdmin={!!isAdmin} />
           </TabsContent>
-          <TabsContent value="categories" className="mt-6">
-            <CategoriesTab />
-          </TabsContent>
-          <TabsContent value="analytics" className="mt-6">
-            <AnalyticsTab />
+          
+          {isAdmin && (
+            <>
+              <TabsContent value="categories" className="mt-6"><CategoriesTab /></TabsContent>
+              <TabsContent value="analytics" className="mt-6"><AnalyticsTab /></TabsContent>
+            </>
+          )}
+          
+          <TabsContent value="logs" className="mt-6">
+            <ActivityLogsTab />
           </TabsContent>
         </Tabs>
       </main>
@@ -98,7 +108,7 @@ const StatCard = ({ label, value, icon }: { label: string; value: number; icon: 
   </div>
 );
 
-const ArtifactsTab = ({ artifacts, categories }: { artifacts: any; categories: any }) => {
+const ArtifactsTab = ({ artifacts, categories, isAdmin }: { artifacts: any; categories: any; isAdmin: boolean }) => {
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", category_id: "", description: "", historical_background: "", date_origin: "", location_found: "", display_location: "", condition_status: "Good" });
@@ -132,22 +142,28 @@ const ArtifactsTab = ({ artifacts, categories }: { artifacts: any; categories: a
     if (!form.name.trim()) { toast({ title: "Name is required", variant: "destructive" }); return; }
     setSaving(true);
     try {
-      const payload = { ...form, category_id: form.category_id || null };
+      const payload = { 
+        ...form, 
+        category_id: form.category_id || null,
+        status: isAdmin ? 'approved' : 'pending' 
+      };
+      
       let artifactId = editId;
 
       if (editId) {
-        const { error } = await supabase.from("artifacts").update(payload).eq("id", editId);
+        // FIXED: Added (supabase as any)
+        const { error } = await (supabase as any).from("artifacts").update(payload).eq("id", editId);
         if (error) throw error;
       } else {
-        const { data, error } = await supabase.from("artifacts").insert(payload).select("id").single();
+        // FIXED: Added (supabase as any)
+        const { data, error } = await (supabase as any).from("artifacts").insert(payload).select("id").single();
         if (error) throw error;
         artifactId = data.id;
-        // Set QR code URL
+        
         const publicUrl = `${window.location.origin}/artifact/${artifactId}`;
         await supabase.from("artifacts").update({ qr_code_url: publicUrl }).eq("id", artifactId);
       }
 
-      // Upload images
       if (files && artifactId) {
         for (let i = 0; i < files.length; i++) {
           const url = await uploadArtifactImage(files[i]);
@@ -155,8 +171,14 @@ const ArtifactsTab = ({ artifacts, categories }: { artifacts: any; categories: a
         }
       }
 
-      queryClient.invalidateQueries({ queryKey: ["artifacts"] });
-      toast({ title: editId ? "Artifact updated" : "Artifact created" });
+      queryClient.invalidateQueries({ queryKey: ["admin_artifacts"] });
+      toast({ title: editId ? "Artifact updated" : (isAdmin ? "Artifact created" : "Artifact submitted for approval!") });
+      
+      await logActivity(
+        editId ? "Edit Artifact" : "Create Artifact", 
+        `${editId ? 'Edited' : 'Created'} artifact: ${form.name}`
+      );
+
       setOpen(false);
       resetForm();
     } catch (err: any) {
@@ -166,11 +188,20 @@ const ArtifactsTab = ({ artifacts, categories }: { artifacts: any; categories: a
     }
   };
 
+  // FIXED: Added (supabase as any) to stop TypeScript errors on 'status'
+  const handleApprove = async (id: string, name: string) => {
+    await (supabase as any).from("artifacts").update({ status: 'approved' }).eq("id", id);
+    await logActivity("Approve Artifact", `Approved artifact: ${name}`);
+    queryClient.invalidateQueries({ queryKey: ["admin_artifacts"] });
+    toast({ title: "Artifact Approved!" });
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this artifact?")) return;
     await supabase.from("artifacts").delete().eq("id", id);
-    queryClient.invalidateQueries({ queryKey: ["artifacts"] });
+    queryClient.invalidateQueries({ queryKey: ["admin_artifacts"] });
     toast({ title: "Artifact deleted" });
+    await logActivity("Delete Artifact", `Deleted artifact ID: ${id}`);
   };
 
   return (
@@ -211,6 +242,9 @@ const ArtifactsTab = ({ artifacts, categories }: { artifacts: any; categories: a
                 </div>
               </div>
               <div><Label>Images</Label><Input type="file" accept="image/*" multiple onChange={(e) => setFiles(e.target.files)} /></div>
+              
+              {!isAdmin && !editId && <p className="text-xs text-yellow-600 bg-yellow-50 p-2 rounded">Note: This artifact will need admin approval before appearing on the public website.</p>}
+              
               <Button onClick={handleSave} disabled={saving} className="w-full">{saving ? "Saving…" : "Save Artifact"}</Button>
             </div>
           </DialogContent>
@@ -219,7 +253,7 @@ const ArtifactsTab = ({ artifacts, categories }: { artifacts: any; categories: a
 
       <div className="space-y-3">
         {artifacts?.map((a: any) => (
-          <div key={a.id} className="flex items-center gap-4 rounded-lg border border-border bg-card p-4">
+          <div key={a.id} className={`flex items-center gap-4 rounded-lg border p-4 ${a.status === 'pending' ? 'bg-yellow-500/5 border-yellow-500/20' : 'bg-card border-border'}`}>
             <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
               {a.artifact_images?.[0]?.image_url ? (
                 <img src={a.artifact_images[0].image_url} alt="" className="h-full w-full object-cover" />
@@ -227,47 +261,52 @@ const ArtifactsTab = ({ artifacts, categories }: { artifacts: any; categories: a
                 <div className="flex h-full items-center justify-center text-muted-foreground"><Image className="h-5 w-5" /></div>
               )}
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-display font-semibold truncate">{a.name}</p>
-              <p className="text-xs text-muted-foreground">{a.categories?.name || "Uncategorized"} · {a.view_count} views</p>
+            
+            <div className="flex-1 min-w-0 flex items-center gap-2">
+              <div>
+                <p className="font-display font-semibold truncate">{a.name}</p>
+                <p className="text-xs text-muted-foreground">{a.categories?.name || "Uncategorized"} · {a.view_count} views</p>
+              </div>
+              {a.status === 'pending' && (
+                <span className="ml-2 inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800">
+                  Pending Approval
+                </span>
+              )}
             </div>
-            {/* QR Code mini preview */}
-            {/* QR Code Button & Modal */}
-<div className="hidden md:block">
-  <Dialog>
-    <DialogTrigger asChild>
-      <Button variant="outline" size="sm" className="gap-1">
-        <QrCode className="h-4 w-4" />
-        View QR
-      </Button>
-    </DialogTrigger>
-    <DialogContent className="sm:max-w-md flex flex-col items-center p-6">
-      <DialogHeader>
-        <DialogTitle className="text-center font-display mb-2 text-xl">
-          {a.name}
-        </DialogTitle>
-      </DialogHeader>
-      
-      {/* Malaking QR Code na may white background padding */}
-      <div className="rounded-xl border-4 border-white bg-white p-4 shadow-lg">
-        <QRCodeSVG 
-          value={`${window.location.origin}/artifact/${a.id}`} 
-          size={256} 
-          level="H" 
-          includeMargin={true}
-        />
-      </div>
-      
-      <p className="mt-4 text-center text-sm text-muted-foreground">
-        I-right click ang QR code sa itaas at piliin ang <br/>
-        <strong>"Save image as..."</strong> para ma-download ito nang malinaw.
-      </p>
-    </DialogContent>
-  </Dialog>
-</div>
+            
+            <div className="hidden md:block">
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1 mr-2">
+                    <QrCode className="h-4 w-4" />
+                    View QR
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md flex flex-col items-center p-6">
+                  <DialogHeader>
+                    <DialogTitle className="text-center font-display mb-2 text-xl">{a.name}</DialogTitle>
+                  </DialogHeader>
+                  <div className="rounded-xl border-4 border-white bg-white p-4 shadow-lg">
+                    <QRCodeSVG value={`${window.location.origin}/artifact/${a.id}`} size={256} level="H" includeMargin={true} />
+                  </div>
+                  <p className="mt-4 text-center text-sm text-muted-foreground">Right-click the QR code above and select <br/><strong>"Save image as..."</strong> to download clearly.</p>
+                </DialogContent>
+              </Dialog>
+            </div>
+            
             <div className="flex gap-1">
-              <Button variant="ghost" size="icon" onClick={() => openEdit(a)}><Pencil className="h-4 w-4" /></Button>
-              <Button variant="ghost" size="icon" onClick={() => handleDelete(a.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+              {isAdmin && a.status === 'pending' && (
+                <Button variant="default" size="sm" className="bg-green-600 hover:bg-green-700 mr-2" onClick={() => handleApprove(a.id, a.name)}>
+                  <CheckCircle className="h-4 w-4 mr-1" /> Approve
+                </Button>
+              )}
+              
+              {isAdmin && (
+                <>
+                  <Button variant="ghost" size="icon" onClick={() => openEdit(a)}><Pencil className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" onClick={() => handleDelete(a.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                </>
+              )}
             </div>
           </div>
         ))}
