@@ -76,10 +76,8 @@ const Gallery = () => {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.05, duration: 0.4 }}
                 >
-                  <Link
-                    to={`/artifact/${artifact.id}`}
-                    className="group block overflow-hidden rounded-xl border border-border bg-card shadow-museum transition-all hover:-translate-y-1 hover:shadow-lg"
-                  >
+                  {/* Pinalitan ang <Link> ng <div> para hindi ma-click */}
+                  <div className="group block overflow-hidden rounded-xl border border-border bg-card shadow-museum transition-all hover:-translate-y-1 hover:shadow-lg">
                     <div className="aspect-[4/3] overflow-hidden bg-muted">
                       {mainImage ? (
                         <img src={mainImage} alt={artifact.name} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
@@ -89,20 +87,16 @@ const Gallery = () => {
                         </div>
                       )}
                     </div>
-                    <div className="p-5">
-                      {artifact.categories?.name && (
-                        <span className="mb-2 inline-block rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
-                          {artifact.categories.name}
-                        </span>
-                      )}
+                    
+                    {/* Title and prompt na lang ang iniwan natin */}
+                    <div className="p-5 text-center">
                       <h3 className="font-display text-lg font-semibold">{artifact.name}</h3>
-                      <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{artifact.description}</p>
-                      <div className="mt-3 flex items-center gap-1 text-xs text-muted-foreground">
-                        <QrCode className="h-3 w-3" />
-                        <span>{artifact.view_count} views</span>
+                      <div className="mt-3 flex items-center justify-center gap-1 text-xs font-medium text-muted-foreground bg-secondary/50 py-1.5 rounded-md">
+                        <QrCode className="h-3.5 w-3.5 text-primary" />
+                        <span>Scan QR at the museum for details</span>
                       </div>
                     </div>
-                  </Link>
+                  </div>
                 </motion.div>
               );
             })}
