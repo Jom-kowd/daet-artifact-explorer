@@ -41,7 +41,7 @@ const AdminLogin = () => {
           <Link to="/" className="inline-flex items-center gap-2 mb-4">
             <QrCode className="h-8 w-8 text-primary" />
           </Link>
-          <h1 className="font-display text-2xl font-bold">Admin Login</h1>
+          <h1 className="font-display text-2xl font-bold">LOGIN</h1>
           <p className="mt-1 text-sm text-muted-foreground">DAET Digital Museum Management</p>
         </div>
         <form onSubmit={handleLogin} className="space-y-4">
