@@ -74,12 +74,15 @@ const AdminDashboard = () => {
         </div>
 
         <Tabs defaultValue="artifacts">
-          <TabsList className="flex flex-wrap h-auto">
-            <TabsTrigger value="artifacts">Artifacts</TabsTrigger>
-            {isAdmin && <TabsTrigger value="categories">Categories</TabsTrigger>}
-            {isAdmin && <TabsTrigger value="analytics">Analytics</TabsTrigger>}
-            <TabsTrigger value="logs" className="hidden md:flex"><ClipboardList className="mr-2 h-4 w-4"/> Activity Logs</TabsTrigger>
-          </TabsList>
+          {/* RESPONSIVE TABS: Allows horizontal scrolling on small screens instead of squishing */}
+          <div className="w-full overflow-x-auto pb-2 -mb-2">
+            <TabsList className="flex w-max min-w-full justify-start md:justify-center">
+              <TabsTrigger value="artifacts" className="flex-shrink-0">Artifacts</TabsTrigger>
+              {isAdmin && <TabsTrigger value="categories" className="flex-shrink-0">Categories</TabsTrigger>}
+              {isAdmin && <TabsTrigger value="analytics" className="flex-shrink-0">Analytics</TabsTrigger>}
+              <TabsTrigger value="logs" className="flex-shrink-0"><ClipboardList className="mr-2 h-4 w-4 hidden sm:inline"/> Activity Logs</TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="artifacts" className="mt-6">
             <ArtifactsTab artifacts={artifacts} categories={categories} isAdmin={!!isAdmin} />

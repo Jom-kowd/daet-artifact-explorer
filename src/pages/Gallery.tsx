@@ -31,12 +31,13 @@ const Gallery = () => {
         <h1 className="mb-2 font-display text-4xl font-bold">Artifact Gallery</h1>
         <p className="mb-8 text-muted-foreground">Browse the cultural treasures of Daet.</p>
 
-        {/* Category filters */}
+        {/* Category filters - RESPONSIVE: flex-wrap ensures buttons drop to the next line on mobile */}
         {categories && categories.length > 0 && (
-          <div className="mb-8 flex flex-wrap gap-2">
+          <div className="mb-8 flex flex-wrap items-center gap-2 overflow-x-auto pb-2 sm:overflow-visible sm:pb-0">
             <Button
               variant={!selectedCategory ? "default" : "outline"}
               size="sm"
+              className="rounded-full px-4"
               onClick={() => setSelectedCategory(null)}
             >
               All
@@ -46,6 +47,7 @@ const Gallery = () => {
                 key={cat.id}
                 variant={selectedCategory === cat.id ? "default" : "outline"}
                 size="sm"
+                className="rounded-full px-4 whitespace-nowrap"
                 onClick={() => setSelectedCategory(cat.id)}
               >
                 {cat.name}

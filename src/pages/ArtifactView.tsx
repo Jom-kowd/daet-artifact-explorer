@@ -1,32 +1,26 @@
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
-import { ArrowLeft, Share2, Eye, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, QrCode } from "lucide-react";
-import { fetchArtifact, logQrScan, incrementViewCount } from "@/lib/supabase-helpers";
+import { ArrowLeft, Calendar, MapPin, Search, ShieldCheck, Eye, Image as ImageIcon } from "lucide-react";
+import { fetchArtifact, incrementViewCount } from "@/lib/supabase-helpers";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 
 const ArtifactView = () => {
   const { id } = useParams<{ id: string }>();
-  const [currentImg, setCurrentImg] = useState(0);
-  const [zoomed, setZoomed] = useState(false);
+
+  useEffect(() => {
+    if (id) incrementViewCount(id);
+  }, [id]);
 
   const { data: artifact, isLoading } = useQuery({
     queryKey: ["artifact", id],
-    queryFn: () => fetchArtifact(id!),
+    queryFn: () => fetchArtifact(id as string),
     enabled: !!id,
   });
 
-  useEffect(() => {
-    if (id) {
-      logQrScan(id);
-      incrementViewCount(id);
-    }
-  }, [id]);
-
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
       </div>
     );
@@ -34,139 +28,104 @@ const ArtifactView = () => {
 
   if (!artifact) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4">
-        <p className="text-xl text-muted-foreground">Artifact not found</p>
-        <Link to="/gallery"><Button variant="outline">Back to Gallery</Button></Link>
+      <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4 text-center">
+        <h1 className="font-display text-2xl font-bold">Artifact Not Found</h1>
+        <p className="mt-2 text-muted-foreground">The artifact you are looking for does not exist or has been removed.</p>
+        <Link to="/"><Button className="mt-6">Return Home</Button></Link>
       </div>
     );
   }
 
-  const images = artifact.artifact_images?.sort((a: any, b: any) => a.display_order - b.display_order) || [];
-
-  const share = () => {
-    if (navigator.share) {
-      navigator.share({ title: artifact.name, url: window.location.href });
-    } else {
-      navigator.clipboard.writeText(window.location.href);
-    }
-  };
+  const mainImage = artifact.artifact_images?.[0]?.image_url;
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-md">
-        <div className="container flex h-14 items-center justify-between">
-          <Link to="/gallery" className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="h-4 w-4" /> Back
+    <div className="min-h-screen bg-background pb-20">
+      {/* Mobile-friendly Sticky Header */}
+      <header className="sticky top-0 z-50 border-b border-border bg-background/80 px-4 backdrop-blur-md">
+        <div className="container mx-auto flex h-14 max-w-5xl items-center justify-between">
+          <Link to="/gallery">
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
           </Link>
-          <Button variant="ghost" size="sm" onClick={share}>
-            <Share2 className="mr-1 h-4 w-4" /> Share
-          </Button>
+          <span className="font-display text-sm font-semibold truncate px-4">{artifact.name}</span>
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Eye className="h-3.5 w-3.5" /> {artifact.view_count || 0}
+          </div>
         </div>
       </header>
 
-      <main className="container max-w-5xl py-8">
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
-          {/* Image Gallery */}
-          {images.length > 0 && (
-            <div className="mb-8">
-              <div
-                className={`relative overflow-hidden rounded-xl bg-museum-dark ${zoomed ? "cursor-zoom-out" : "cursor-zoom-in"}`}
-                onClick={() => setZoomed(!zoomed)}
-              >
-                <img
-                  src={images[currentImg]?.image_url}
-                  alt={artifact.name}
-                  className={`mx-auto max-h-[70vh] w-full object-contain transition-transform duration-300 ${zoomed ? "scale-150" : "scale-100"}`}
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="absolute bottom-3 right-3 bg-museum-dark/60 text-white backdrop-blur"
-                  onClick={(e) => { e.stopPropagation(); setZoomed(!zoomed); }}
-                >
-                  {zoomed ? <ZoomOut className="h-4 w-4" /> : <ZoomIn className="h-4 w-4" />}
-                </Button>
-                {images.length > 1 && (
-                  <>
-                    <Button
-                      variant="ghost" size="icon"
-                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-museum-dark/60 text-white backdrop-blur"
-                      onClick={(e) => { e.stopPropagation(); setCurrentImg((currentImg - 1 + images.length) % images.length); }}
-                    >
-                      <ChevronLeft className="h-5 w-5" />
-                    </Button>
-                    <Button
-                      variant="ghost" size="icon"
-                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-museum-dark/60 text-white backdrop-blur"
-                      onClick={(e) => { e.stopPropagation(); setCurrentImg((currentImg + 1) % images.length); }}
-                    >
-                      <ChevronRight className="h-5 w-5" />
-                    </Button>
-                  </>
-                )}
-              </div>
-              {images.length > 1 && (
-                <div className="mt-3 flex gap-2 overflow-x-auto">
-                  {images.map((img: any, i: number) => (
-                    <button
-                      key={img.id}
-                      onClick={() => setCurrentImg(i)}
-                      className={`h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg border-2 transition-all ${i === currentImg ? "border-primary" : "border-transparent opacity-60 hover:opacity-100"}`}
-                    >
-                      <img src={img.image_url} alt="" className="h-full w-full object-cover" />
-                    </button>
-                  ))}
+      <main className="container mx-auto mt-6 max-w-5xl px-4 sm:px-6 lg:px-8">
+        {/* RESPONSIVE LAYOUT: Stack on mobile (flex-col), side-by-side on desktop (lg:flex-row) */}
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-12">
+          
+          {/* IMAGE SECTION */}
+          <div className="w-full lg:sticky lg:top-24 lg:w-1/2">
+            <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm aspect-[4/3] sm:aspect-video lg:aspect-square">
+              {mainImage ? (
+                <img src={mainImage} alt={artifact.name} className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center text-muted-foreground">
+                  <ImageIcon className="mb-2 h-12 w-12 opacity-50" />
+                  <p>No image available</p>
                 </div>
               )}
             </div>
-          )}
+            {/* Gallery thumbnails could go here in the future */}
+          </div>
 
-          {/* Details */}
-          <div className="grid gap-8 lg:grid-cols-3">
-            <div className="lg:col-span-2">
+          {/* DETAILS SECTION */}
+          <div className="w-full space-y-8 lg:w-1/2">
+            <div>
               {artifact.categories?.name && (
-                <span className="mb-3 inline-block rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                <span className="mb-3 inline-block rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
                   {artifact.categories.name}
                 </span>
               )}
-              <h1 className="mb-4 font-display text-3xl font-bold md:text-4xl">{artifact.name}</h1>
-              {artifact.description && (
-                <p className="mb-6 text-muted-foreground leading-relaxed">{artifact.description}</p>
-              )}
-              {artifact.historical_background && (
-                <div className="mb-6">
-                  <h2 className="mb-2 font-display text-xl font-semibold">Historical Background</h2>
-                  <p className="text-muted-foreground leading-relaxed">{artifact.historical_background}</p>
-                </div>
-              )}
+              <h1 className="font-display text-3xl font-bold leading-tight sm:text-4xl md:text-5xl">{artifact.name}</h1>
             </div>
 
-            <div className="space-y-4 rounded-xl border border-border bg-card p-6">
-              <h3 className="font-display text-lg font-semibold">Details</h3>
-              <InfoRow label="Date of Origin" value={artifact.date_origin} />
-              <InfoRow label="Location Found" value={artifact.location_found} />
-              <InfoRow label="Display Location" value={artifact.display_location} />
-              <InfoRow label="Condition" value={artifact.condition_status} />
-              <div className="flex items-center gap-2 border-t border-border pt-4 text-sm text-muted-foreground">
-                <Eye className="h-4 w-4" />
-                <span>{artifact.view_count} total views</span>
-              </div>
+            {/* Quick Info Grid - Responsive 2 columns */}
+            <div className="grid grid-cols-2 gap-4 rounded-xl border border-border bg-card p-4 sm:p-5">
+              <InfoItem icon={<Calendar className="h-4 w-4" />} label="Origin Date" value={artifact.date_origin} />
+              <InfoItem icon={<MapPin className="h-4 w-4" />} label="Location Found" value={artifact.location_found} />
+              <InfoItem icon={<Search className="h-4 w-4" />} label="Display Location" value={artifact.display_location} />
+              <InfoItem icon={<ShieldCheck className="h-4 w-4" />} label="Condition" value={artifact.condition_status} />
+            </div>
+
+            {/* Text Content */}
+            <div className="space-y-6">
+              {artifact.description && (
+                <section>
+                  <h3 className="mb-2 font-display text-xl font-semibold">Description</h3>
+                  <p className="text-muted-foreground leading-relaxed sm:text-lg">{artifact.description}</p>
+                </section>
+              )}
+
+              {artifact.historical_background && (
+                <section>
+                  <h3 className="mb-2 font-display text-xl font-semibold">Historical Background</h3>
+                  <div className="prose prose-sm sm:prose-base dark:prose-invert text-muted-foreground leading-relaxed">
+                    <p>{artifact.historical_background}</p>
+                  </div>
+                </section>
+              )}
             </div>
           </div>
-        </motion.div>
+        </div>
       </main>
     </div>
   );
 };
 
-const InfoRow = ({ label, value }: { label: string; value?: string | null }) => {
-  if (!value) return null;
-  return (
-    <div className="border-b border-border pb-3">
-      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className="mt-0.5 text-sm font-medium">{value}</p>
+// Reusable micro-component for the info grid
+const InfoItem = ({ icon, label, value }: { icon: React.ReactNode; label: string; value: string | null }) => (
+  <div className="flex flex-col gap-1">
+    <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+      {icon} <span>{label}</span>
     </div>
-  );
-};
+    <p className="text-sm font-semibold sm:text-base">{value || "Unknown"}</p>
+  </div>
+);
 
 export default ArtifactView;
