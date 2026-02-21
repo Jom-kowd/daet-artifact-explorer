@@ -232,9 +232,39 @@ const ArtifactsTab = ({ artifacts, categories }: { artifacts: any; categories: a
               <p className="text-xs text-muted-foreground">{a.categories?.name || "Uncategorized"} · {a.view_count} views</p>
             </div>
             {/* QR Code mini preview */}
-            <div className="hidden md:block">
-              <QRCodeSVG value={`${window.location.origin}/artifact/${a.id}`} size={48} />
-            </div>
+            {/* QR Code Button & Modal */}
+<div className="hidden md:block">
+  <Dialog>
+    <DialogTrigger asChild>
+      <Button variant="outline" size="sm" className="gap-1">
+        <QrCode className="h-4 w-4" />
+        View QR
+      </Button>
+    </DialogTrigger>
+    <DialogContent className="sm:max-w-md flex flex-col items-center p-6">
+      <DialogHeader>
+        <DialogTitle className="text-center font-display mb-2 text-xl">
+          {a.name}
+        </DialogTitle>
+      </DialogHeader>
+      
+      {/* Malaking QR Code na may white background padding */}
+      <div className="rounded-xl border-4 border-white bg-white p-4 shadow-lg">
+        <QRCodeSVG 
+          value={`${window.location.origin}/artifact/${a.id}`} 
+          size={256} 
+          level="H" 
+          includeMargin={true}
+        />
+      </div>
+      
+      <p className="mt-4 text-center text-sm text-muted-foreground">
+        I-right click ang QR code sa itaas at piliin ang <br/>
+        <strong>"Save image as..."</strong> para ma-download ito nang malinaw.
+      </p>
+    </DialogContent>
+  </Dialog>
+</div>
             <div className="flex gap-1">
               <Button variant="ghost" size="icon" onClick={() => openEdit(a)}><Pencil className="h-4 w-4" /></Button>
               <Button variant="ghost" size="icon" onClick={() => handleDelete(a.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
