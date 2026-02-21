@@ -256,59 +256,64 @@ const ArtifactsTab = ({ artifacts, categories, isAdmin }: { artifacts: any; cate
 
       <div className="space-y-3">
         {artifacts?.map((a: any) => (
-          <div key={a.id} className={`flex items-center gap-4 rounded-lg border p-4 ${a.status === 'pending' ? 'bg-yellow-500/5 border-yellow-500/20' : 'bg-card border-border'}`}>
-            <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
-              {a.artifact_images?.[0]?.image_url ? (
-                <img src={a.artifact_images[0].image_url} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <div className="flex h-full items-center justify-center text-muted-foreground"><Image className="h-5 w-5" /></div>
-              )}
-            </div>
+          // RESPONSIVE LIST ITEM: flex-col on mobile, sm:flex-row on bigger screens
+          <div key={a.id} className={`flex flex-col sm:flex-row sm:items-center gap-4 rounded-lg border p-4 ${a.status === 'pending' ? 'bg-yellow-500/5 border-yellow-500/20' : 'bg-card border-border'}`}>
             
-            <div className="flex-1 min-w-0 flex items-center gap-2">
-              <div>
-                <p className="font-display font-semibold truncate">{a.name}</p>
-                <p className="text-xs text-muted-foreground">{a.categories?.name || "Uncategorized"} · {a.view_count} views</p>
+            <div className="flex items-center gap-4 w-full sm:w-auto">
+              <div className="h-16 w-16 sm:h-14 sm:w-14 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
+                {a.artifact_images?.[0]?.image_url ? (
+                  <img src={a.artifact_images[0].image_url} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-muted-foreground"><Image className="h-5 w-5" /></div>
+                )}
               </div>
-              {a.status === 'pending' && (
-                <span className="ml-2 inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800">
-                  Pending Approval
-                </span>
-              )}
+              
+              <div className="flex-1 min-w-0">
+                <p className="font-display font-semibold truncate text-lg sm:text-base">{a.name}</p>
+                <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-muted-foreground">
+                  <span>{a.categories?.name || "Uncategorized"}</span>
+                  <span>·</span>
+                  <span>{a.view_count} views</span>
+                  {a.status === 'pending' && (
+                    <span className="inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-medium text-yellow-800">
+                      Pending
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
             
-            <div className="hidden md:block">
+            {/* Buttons adapt to full width on mobile, right-aligned on desktop */}
+            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 mt-3 sm:mt-0 sm:ml-auto w-full sm:w-auto border-t sm:border-0 pt-3 sm:pt-0 border-border">
               <Dialog>
                 <DialogTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-1 mr-2">
-                    <QrCode className="h-4 w-4" />
-                    View QR
+                  <Button variant="outline" size="sm" className="flex-1 sm:flex-none gap-1">
+                    <QrCode className="h-4 w-4" /> <span className="sm:hidden">QR</span><span className="hidden sm:inline">View QR</span>
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-md flex flex-col items-center p-6">
+                <DialogContent className="sm:max-w-md flex flex-col items-center p-6 w-[90vw] rounded-xl">
+                  {/* ... (Keep your QR Code dialog content the same) ... */}
                   <DialogHeader>
                     <DialogTitle className="text-center font-display mb-2 text-xl">{a.name}</DialogTitle>
                   </DialogHeader>
                   <div className="rounded-xl border-4 border-white bg-white p-4 shadow-lg">
-                    <QRCodeSVG value={`${window.location.origin}/artifact/${a.id}`} size={256} level="H" includeMargin={true} />
+                    <QRCodeSVG value={`${window.location.origin}/artifact/${a.id}`} size={200} level="H" includeMargin={true} />
                   </div>
                   <p className="mt-4 text-center text-sm text-muted-foreground">Right-click the QR code above and select <br/><strong>"Save image as..."</strong> to download clearly.</p>
                 </DialogContent>
               </Dialog>
-            </div>
-            
-            <div className="flex gap-1">
+              
               {isAdmin && a.status === 'pending' && (
-                <Button variant="default" size="sm" className="bg-green-600 hover:bg-green-700 mr-2" onClick={() => handleApprove(a.id, a.name)}>
-                  <CheckCircle className="h-4 w-4 mr-1" /> Approve
+                <Button variant="default" size="sm" className="flex-1 sm:flex-none bg-green-600 hover:bg-green-700" onClick={() => handleApprove(a.id, a.name)}>
+                  <CheckCircle className="h-4 w-4 sm:mr-1" /> <span className="sm:hidden">OK</span><span className="hidden sm:inline">Approve</span>
                 </Button>
               )}
               
               {isAdmin && (
-                <>
+                <div className="flex gap-1 ml-auto sm:ml-0">
                   <Button variant="ghost" size="icon" onClick={() => openEdit(a)}><Pencil className="h-4 w-4" /></Button>
                   <Button variant="ghost" size="icon" onClick={() => handleDelete(a.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                </>
+                </div>
               )}
             </div>
           </div>
