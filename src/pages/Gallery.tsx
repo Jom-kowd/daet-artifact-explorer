@@ -1,0 +1,116 @@
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
+import { motion } from "framer-motion";
+import { QrCode, ArrowLeft, ImageOff } from "lucide-react";
+import { fetchArtifacts, fetchCategories } from "@/lib/supabase-helpers";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+
+const Gallery = () => {
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const { data: artifacts, isLoading } = useQuery({ queryKey: ["artifacts"], queryFn: fetchArtifacts });
+  const { data: categories } = useQuery({ queryKey: ["categories"], queryFn: fetchCategories });
+
+  const filtered = selectedCategory
+    ? artifacts?.filter((a: any) => a.category_id === selectedCategory)
+    : artifacts;
+
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-md">
+        <div className="container flex h-16 items-center justify-between">
+          <Link to="/" className="flex items-center gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            <QrCode className="h-5 w-5 text-primary" />
+            <span className="font-display text-lg font-bold">Collection</span>
+          </Link>
+        </div>
+      </header>
+
+      <main className="container py-12">
+        <h1 className="mb-2 font-display text-4xl font-bold">Artifact Gallery</h1>
+        <p className="mb-8 text-muted-foreground">Browse the cultural treasures of Daet.</p>
+
+        {/* Category filters */}
+        {categories && categories.length > 0 && (
+          <div className="mb-8 flex flex-wrap gap-2">
+            <Button
+              variant={!selectedCategory ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedCategory(null)}
+            >
+              All
+            </Button>
+            {categories.map((cat: any) => (
+              <Button
+                key={cat.id}
+                variant={selectedCategory === cat.id ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSelectedCategory(cat.id)}
+              >
+                {cat.name}
+              </Button>
+            ))}
+          </div>
+        )}
+
+        {isLoading ? (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="h-72 animate-pulse rounded-xl bg-muted" />
+            ))}
+          </div>
+        ) : !filtered?.length ? (
+          <div className="flex flex-col items-center justify-center py-24 text-muted-foreground">
+            <ImageOff className="mb-4 h-12 w-12" />
+            <p>No artifacts found. Check back soon!</p>
+          </div>
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {filtered.map((artifact: any, i: number) => {
+              const mainImage = artifact.artifact_images?.[0]?.image_url;
+              return (
+                <motion.div
+                  key={artifact.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.05, duration: 0.4 }}
+                >
+                  <Link
+                    to={`/artifact/${artifact.id}`}
+                    className="group block overflow-hidden rounded-xl border border-border bg-card shadow-museum transition-all hover:-translate-y-1 hover:shadow-lg"
+                  >
+                    <div className="aspect-[4/3] overflow-hidden bg-muted">
+                      {mainImage ? (
+                        <img src={mainImage} alt={artifact.name} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-muted-foreground">
+                          <ImageOff className="h-10 w-10" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-5">
+                      {artifact.categories?.name && (
+                        <span className="mb-2 inline-block rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                          {artifact.categories.name}
+                        </span>
+                      )}
+                      <h3 className="font-display text-lg font-semibold">{artifact.name}</h3>
+                      <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{artifact.description}</p>
+                      <div className="mt-3 flex items-center gap-1 text-xs text-muted-foreground">
+                        <QrCode className="h-3 w-3" />
+                        <span>{artifact.view_count} views</span>
+                      </div>
+                    </div>
+                  </Link>
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
+      </main>
+    </div>
+  );
+};
+
+export default Gallery;
